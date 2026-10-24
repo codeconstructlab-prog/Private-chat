@@ -174,19 +174,22 @@
 <body>
   <div class="container">
     <header>
-      <h2>🔒 Private Chat</h2>
-      <p>Sirf authorized users ke liye</p>
+      <h2>❤️ just tell me</h2>
+      <p>this site developed by Rohit panika </p>
     </header>
 
     <div id="loginScreen" class="panel">
-      <h3>Login karo</h3>
+      <h3>Login </h3>
 
       <form id="loginForm">
         <input
           id="email"
           type="email"
           placeholder="Apna email address"
-          autocomplete="username"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+          name="chat_login_email"
           required
         >
 
@@ -194,7 +197,8 @@
           id="password"
           type="password"
           placeholder="Password"
-          autocomplete="current-password"
+          autocomplete="new-password"
+          name="chat_login_password"
           required
         >
 
@@ -202,14 +206,14 @@
       </form>
 
       <p style="font-size:13px;color:#667085">
-        Login ke liye Supabase mein pehle se banaya hua email aur password use karo.
+        
       </p>
     </div>
 
     <div id="chatScreen">
       <div class="chatTop">
         <div>
-          <strong>Private Room</strong>
+          <strong>💕 Love box </strong>
           <div id="userLabel" style="font-size:12px;color:#667085"></div>
         </div>
         <button id="logoutButton" class="secondary" type="button">
@@ -226,7 +230,7 @@
           id="messageInput"
           type="text"
           maxlength="4000"
-          placeholder="Message likho..."
+          placeholder="type here..."
           autocomplete="off"
           required
         >
@@ -237,9 +241,7 @@
     <div id="status" role="status"></div>
 
     <div class="hint">
-      Is app ko Supabase Auth, chat_members aur chat_messages tables
-      aur unki Row Level Security policies ki zaroorat hai.
-      Password kisi ke saath share mat karo.
+      just stay here ......  jab me duty me hu to isme hi baat karenge 
     </div>
   </div>
 
@@ -316,7 +318,7 @@
       const sender = document.createElement("div");
       sender.className = "sender";
       sender.textContent =
-        message.sender_id === currentUser?.id ? "You" : "Other user";
+        message.sender_id === currentUser?.id ? "Rohit" : "sonu";
 
       const content = document.createElement("div");
       content.textContent = message.message;
