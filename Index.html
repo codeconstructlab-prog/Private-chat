@@ -1,0 +1,545 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Private Chat</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #eef2f7;
+      color: #1f2937;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+      min-height: 100vh;
+      margin: auto;
+      background: white;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #155eef;
+      color: white;
+      padding: 18px;
+      text-align: center;
+    }
+
+    header h2 { margin: 0 0 6px; }
+    header p { margin: 0; font-size: 13px; }
+
+    .panel { padding: 20px; }
+
+    input, button {
+      width: 100%;
+      padding: 13px;
+      margin: 7px 0;
+      border-radius: 9px;
+      font-size: 16px;
+    }
+
+    input {
+      border: 1px solid #ccd3df;
+      outline: none;
+    }
+
+    input:focus { border-color: #155eef; }
+
+    button {
+      border: none;
+      background: #155eef;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    .secondary { background: #475467; }
+
+    #status {
+      padding: 0 20px;
+      color: #b42318;
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+
+    #chatScreen {
+      display: none;
+      flex: 1;
+      min-height: 0;
+      flex-direction: column;
+    }
+
+    .chatTop {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border-bottom: 1px solid #e4e7ec;
+    }
+
+    .chatTop button {
+      width: auto;
+      margin: 0;
+      padding: 9px 12px;
+      font-size: 13px;
+    }
+
+    #messages {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+      min-height: 250px;
+      height: 55vh;
+      overflow-y: auto;
+      background: #f8fafc;
+    }
+
+    .message {
+      max-width: 85%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .mine {
+      align-self: flex-end;
+      background: #dbeafe;
+    }
+
+    .theirs {
+      align-self: flex-start;
+      background: #e4e7ec;
+    }
+
+    .sender {
+      font-size: 11px;
+      color: #475467;
+      margin-bottom: 5px;
+    }
+
+    .time {
+      font-size: 10px;
+      color: #667085;
+      margin-top: 5px;
+      text-align: right;
+    }
+
+    #sendForm {
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      border-top: 1px solid #e4e7ec;
+      background: white;
+    }
+
+    #messageInput {
+      flex: 1;
+      min-width: 0;
+      margin: 0;
+    }
+
+    #sendButton {
+      width: 90px;
+      margin: 0;
+    }
+
+    .hint {
+      padding: 0 20px 20px;
+      font-size: 12px;
+      color: #667085;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h2>🔒 Private Chat</h2>
+      <p>Sirf authorized users ke liye</p>
+    </header>
+
+    <div id="loginScreen" class="panel">
+      <h3>Login karo</h3>
+
+      <form id="loginForm">
+        <input
+          id="email"
+          type="email"
+          placeholder="Apna email address"
+          autocomplete="username"
+          required
+        >
+
+        <input
+          id="password"
+          type="password"
+          placeholder="Password"
+          autocomplete="current-password"
+          required
+        >
+
+        <button id="loginButton" type="submit">Login</button>
+      </form>
+
+      <p style="font-size:13px;color:#667085">
+        Login ke liye Supabase mein pehle se banaya hua email aur password use karo.
+      </p>
+    </div>
+
+    <div id="chatScreen">
+      <div class="chatTop">
+        <div>
+          <strong>Private Room</strong>
+          <div id="userLabel" style="font-size:12px;color:#667085"></div>
+        </div>
+        <button id="logoutButton" class="secondary" type="button">
+          Logout
+        </button>
+      </div>
+
+      <div id="messages" aria-live="polite">
+        <p style="color:#667085">Messages load ho rahe hain...</p>
+      </div>
+
+      <form id="sendForm">
+        <input
+          id="messageInput"
+          type="text"
+          maxlength="4000"
+          placeholder="Message likho..."
+          autocomplete="off"
+          required
+        >
+        <button id="sendButton" type="submit">Send</button>
+      </form>
+    </div>
+
+    <div id="status" role="status"></div>
+
+    <div class="hint">
+      Is app ko Supabase Auth, chat_members aur chat_messages tables
+      aur unki Row Level Security policies ki zaroorat hai.
+      Password kisi ke saath share mat karo.
+    </div>
+  </div>
+
+  <script>
+    // Supabase project settings
+    const SUPABASE_URL = "https://ooszzsixzszhmphlqfnv.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_ByAFWIX32eGnwyFAiqdw7w_gYDRGCwt";
+
+    // Dono users ke liye ek hi private room
+    const ROOM_ID = "private-room-01";
+
+    const { createClient } = window.supabase;
+
+    const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const loginScreen = document.getElementById("loginScreen");
+    const chatScreen = document.getElementById("chatScreen");
+    const loginForm = document.getElementById("loginForm");
+    const loginButton = document.getElementById("loginButton");
+    const logoutButton = document.getElementById("logoutButton");
+    const sendForm = document.getElementById("sendForm");
+    const sendButton = document.getElementById("sendButton");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const messageInput = document.getElementById("messageInput");
+    const messagesBox = document.getElementById("messages");
+    const statusBox = document.getElementById("status");
+    const userLabel = document.getElementById("userLabel");
+
+    let currentUser = null;
+    let realtimeChannel = null;
+    let displayedMessageIds = new Set();
+    let sending = false;
+
+    function showStatus(message, isError = true) {
+      statusBox.textContent = message;
+      statusBox.style.color = isError ? "#b42318" : "#067647";
+    }
+
+    function setLoggedIn(user) {
+      currentUser = user;
+      loginScreen.style.display = "none";
+      chatScreen.style.display = "flex";
+      userLabel.textContent = user.email || "Logged in";
+      statusBox.textContent = "";
+    }
+
+    function setLoggedOut() {
+      currentUser = null;
+      loginScreen.style.display = "block";
+      chatScreen.style.display = "none";
+      messagesBox.replaceChildren();
+      displayedMessageIds.clear();
+      userLabel.textContent = "";
+    }
+
+    function formatTime(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "";
+      return date.toLocaleString();
+    }
+
+    function renderMessage(message) {
+      const id = String(message.id);
+
+      if (displayedMessageIds.has(id)) return;
+      displayedMessageIds.add(id);
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "message " +
+        (message.sender_id === currentUser?.id ? "mine" : "theirs");
+
+      const sender = document.createElement("div");
+      sender.className = "sender";
+      sender.textContent =
+        message.sender_id === currentUser?.id ? "You" : "Other user";
+
+      const content = document.createElement("div");
+      content.textContent = message.message;
+
+      const time = document.createElement("div");
+      time.className = "time";
+      time.textContent = formatTime(message.created_at);
+
+      wrapper.append(sender, content, time);
+      messagesBox.appendChild(wrapper);
+      messagesBox.scrollTop = messagesBox.scrollHeight;
+    }
+
+    async function checkMembership(user) {
+      const { data, error } = await db
+        .from("chat_members")
+        .select("user_id")
+        .eq("room_id", ROOM_ID)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(
+          "Room membership check nahi hua. Supabase table aur RLS policies check karo. " +
+          error.message
+        );
+      }
+
+      if (!data) {
+        throw new Error(
+          "Access denied: is account ko private room mein add nahi kiya gaya hai."
+        );
+      }
+    }
+
+    async function loadMessages() {
+      messagesBox.replaceChildren();
+
+      const loading = document.createElement("p");
+      loading.textContent = "Messages load ho rahe hain...";
+      loading.style.color = "#667085";
+      messagesBox.appendChild(loading);
+
+      const { data, error } = await db
+        .from("chat_messages")
+        .select("id, room_id, sender_id, message, created_at")
+        .eq("room_id", ROOM_ID)
+        .order("created_at", { ascending: true })
+        .limit(200);
+
+      if (error) {
+        throw new Error("Messages load nahi hue: " + error.message);
+      }
+
+      messagesBox.replaceChildren();
+      displayedMessageIds.clear();
+
+      if (!data || data.length === 0) {
+        const empty = document.createElement("p");
+        empty.textContent = "Abhi koi message nahi hai. Pehla message bhejo!";
+        empty.style.color = "#667085";
+        messagesBox.appendChild(empty);
+        return;
+      }
+
+      data.forEach(renderMessage);
+    }
+
+    function subscribeToMessages() {
+      if (realtimeChannel) {
+        db.removeChannel(realtimeChannel);
+      }
+
+      realtimeChannel = db
+        .channel("private-chat-" + currentUser.id)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "chat_messages",
+            filter: "room_id=eq." + ROOM_ID
+          },
+          (payload) => {
+            if (currentUser && payload.new.room_id === ROOM_ID) {
+              renderMessage(payload.new);
+            }
+          }
+        )
+        .subscribe((state) => {
+          if (state === "SUBSCRIBED") {
+            showStatus("Realtime connected. Chat ready!", false);
+          } else if (state === "CHANNEL_ERROR" || state === "TIMED_OUT") {
+            showStatus(
+              "Realtime connect nahi hua. Supabase mein chat_messages ko Realtime publication mein enable karo."
+            );
+          }
+        });
+    }
+
+    async function openChat(user) {
+      showStatus("");
+      setLoggedIn(user);
+
+      try {
+        await checkMembership(user);
+        await loadMessages();
+        subscribeToMessages();
+      } catch (error) {
+        showStatus(error.message);
+        chatScreen.style.display = "none";
+        loginScreen.style.display = "block";
+      }
+    }
+
+    loginForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      loginButton.disabled = true;
+      loginButton.textContent = "Logging in...";
+      showStatus("");
+
+      try {
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+
+        const { data, error } = await db.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (error) throw error;
+
+        await openChat(data.user);
+      } catch (error) {
+        showStatus("Login nahi hua: " + error.message);
+      } finally {
+        loginButton.disabled = false;
+        loginButton.textContent = "Login";
+      }
+    });
+
+    sendForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      if (!currentUser || sending) return;
+
+      const message = messageInput.value.trim();
+      if (!message) return;
+
+      sending = true;
+      sendButton.disabled = true;
+
+      try {
+        const { data, error } = await db
+          .from("chat_messages")
+          .insert({
+            room_id: ROOM_ID,
+            sender_id: currentUser.id,
+            message: message
+          })
+          .select("id, room_id, sender_id, message, created_at")
+          .single();
+
+        if (error) throw error;
+
+        renderMessage(data);
+        messageInput.value = "";
+        messageInput.focus();
+        showStatus("");
+      } catch (error) {
+        showStatus("Message send nahi hua: " + error.message);
+      } finally {
+        sending = false;
+        sendButton.disabled = false;
+      }
+    });
+
+    logoutButton.addEventListener("click", async () => {
+      logoutButton.disabled = true;
+
+      try {
+        if (realtimeChannel) {
+          await db.removeChannel(realtimeChannel);
+          realtimeChannel = null;
+        }
+
+        const { error } = await db.auth.signOut();
+        if (error) throw error;
+
+        setLoggedOut();
+        showStatus("Logout ho gaya.", false);
+      } catch (error) {
+        showStatus("Logout error: " + error.message);
+      } finally {
+        logoutButton.disabled = false;
+      }
+    });
+
+    async function initializeApp() {
+      try {
+        const { data, error } = await db.auth.getSession();
+        if (error) throw error;
+
+        if (data.session?.user) {
+          await openChat(data.session.user);
+        }
+      } catch (error) {
+        showStatus("App start nahi hua: " + error.message);
+      }
+    }
+
+    db.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        if (realtimeChannel) {
+          db.removeChannel(realtimeChannel);
+          realtimeChannel = null;
+        }
+        setLoggedOut();
+      }
+    });
+
+    initializeApp();
+  </script>
+</body>
+</html>
